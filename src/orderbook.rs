@@ -1,5 +1,6 @@
 use crate::data::{BidAsk, WsOrderBookUpdateData, OrderBookSnapshot};
 
+// Representation of an orderbook
 #[derive(Debug)]
 pub struct OrderBook {
     pub bids: Vec<BidAsk>,
@@ -9,6 +10,7 @@ pub struct OrderBook {
 }
 
 impl OrderBook {
+    // Creates an orderbook from a REST snapshot
     pub fn from_snapshot(snapshot: OrderBookSnapshot) -> Self {
         Self {
             bids: snapshot.data.bids,
@@ -20,6 +22,7 @@ impl OrderBook {
 }
 
 impl OrderBook {
+    // Applies an incremental update to an initialized orderbook
     pub fn apply_update(&mut self, update: WsOrderBookUpdateData) -> bool {
         if update.prev_ts != self.last_ts {
             return false;
@@ -32,6 +35,7 @@ impl OrderBook {
 }
 
 impl OrderBook {
+    // Prints the order book (amount of level is dependant on DEPTH in client.rs)
     pub fn print(&self, depth: usize) {
         println!();
         println!("BIDS\t\t\tASKS");
