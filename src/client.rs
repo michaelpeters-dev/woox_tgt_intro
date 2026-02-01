@@ -3,38 +3,42 @@ use serde_json::json;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 use tokio::sync::mpsc;
+use crate::data::{WsOrderBookUpdate, WsOrderBookUpdateData, OrderBookSnapshot};
+use reqwest::get;
+use crate::orderbook::OrderBook;
 
-const WOOX_URL: &str = "wss://wss.woox.io/v3/public"; // WooX public market data endpoint
+// WooX public endpoint for market data
+const WOOX_URL: &str = "wss://wss.woox.io/v3/public";
+
 const SYMBOL: &str = "PERP_ETH_USDT";
-const DEPTH: usize = 50;
+const DEPTH: usize = 5;
 
 // Connects to the WooX websocket and buffers incoming orderbook updates
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    // channel
-    let (tx, mut rx) = mpsc::channel::<String>(10_000);
+    let (tx, mut rx) = mpsc::channel::<WsOrderBookUpdateData>(10_000);
 
-    // connect
+    // establish connection
     let (ws, _) = connect_async(WOOX_URL).await?;
-    println!("connected to {}", WOOX_URL);
+    println!("Connected to {}", WOOX_URL);
 
     let (mut write, mut read) = ws.split();
 
-    // subscribe
+    // subscribe to updates
     let sub = json!({
         "cmd": "SUBSCRIBE",
         "params": [format!("orderbookupdate@{}@{}", SYMBOL, DEPTH)]
     }).to_string();
     write.send(Message::Text(sub)).await?;
-    println!("subscribed");
+    println!("Subscribed");
 
-    // websocket listener task
+    // websocket task to read messages and forward orderbook updates into the channel
     let tx_clone = tx.clone();
     tokio::spawn(async move {
         while let Some(msg) = read.next().await {
             match msg {
                 Ok(Message::Text(text)) => {
-                    if tx_clone.send(text).await.is_err() {
-                        break;
+                    if let Ok(update) = serde_json::from_str::<WsOrderBookUpdate>(&text) {
+                        let _ = tx_clone.send(update.data).await;
                     }
                 }
                 Ok(Message::Ping(p)) => {
@@ -44,11 +48,45 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     });
+    
+    
+    // fetch a full orderbook snapshot
+    let snapshot = fetch_snapshot().await?;
+    println!(
+        "Snapshot loaded | ts={} bids={} asks={}",
+        snapshot.timestamp,
+        snapshot.data.bids.len(),
+        snapshot.data.asks.len()
+    );
 
-    // processing loop
-    while let Some(msg) = rx.recv().await {
-        println!("buffered update: {msg}\n");
+    // initialize the local orderbook from the snapshot
+    let mut orderbook = OrderBook::from_snapshot(snapshot);
+    println!("Orderbook initialized");
+
+    while let Some(update) = rx.recv().await {
+        if orderbook.last_ts == update.prev_ts {
+            orderbook.apply_update(update);
+            orderbook.print(DEPTH);
+        } else if orderbook.last_ts < update.prev_ts {
+            println!("Missed updates, refetching snapshot");
+            let snapshot = fetch_snapshot().await?;
+            orderbook = OrderBook::from_snapshot(snapshot);
+        } else {
+            println!("Ignoring old update");
+        }
     }
-
     Ok(())
+}
+
+// Fetches a full orderbook snapshot from the WooX REST API
+async fn fetch_snapshot() -> Result<OrderBookSnapshot, reqwest::Error> {
+    let url = format!(
+        "https://api.woox.io/v3/public/orderbook?symbol={}&maxlevel={}",
+        SYMBOL,
+        DEPTH
+    );
+
+    let resp = get(&url).await?;
+    let snapshot = resp.json::<OrderBookSnapshot>().await?;
+    Ok(snapshot)
 }
