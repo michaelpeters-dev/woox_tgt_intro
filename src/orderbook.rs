@@ -6,7 +6,6 @@ pub struct OrderBook {
     pub bids: Vec<BidAsk>,
     pub asks: Vec<BidAsk>,
     pub last_ts: u64,
-    pub initialized: bool,
 }
 
 impl OrderBook {
@@ -16,7 +15,6 @@ impl OrderBook {
             bids: snapshot.data.bids,
             asks: snapshot.data.asks,
             last_ts: snapshot.timestamp,
-            initialized: false,
         }
     }  
 }

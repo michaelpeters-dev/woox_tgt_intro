@@ -11,7 +11,7 @@ use crate::orderbook::OrderBook;
 const WOOX_URL: &str = "wss://wss.woox.io/v3/public";
 
 const SYMBOL: &str = "PERP_ETH_USDT";
-const DEPTH: usize = 5;
+const DEPTH: usize = 50;
 
 // Connects to the WooX websocket and buffers incoming orderbook updates
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {

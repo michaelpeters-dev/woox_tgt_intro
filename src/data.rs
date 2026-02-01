@@ -3,15 +3,12 @@ use serde::Deserialize;
 // WebSocket wrapper for an order book update message
 #[derive(Debug, Deserialize)]
 pub struct WsOrderBookUpdate {
-    pub topic: String,
-    pub ts: u64,
     pub data: WsOrderBookUpdateData,
 }
 
 // Data contained within an WsOrderBookUpdate
 #[derive(Debug, Deserialize)]
 pub struct WsOrderBookUpdateData {
-    pub s: String,        // symbol
     pub prev_ts: u64,
     pub bids: Vec<BidAsk>,
     pub asks: Vec<BidAsk>,
@@ -29,7 +26,6 @@ pub struct BidAsk {
 // REST API orderbook snapshot response
 #[derive(Debug, Deserialize)]
 pub struct OrderBookSnapshot {
-    pub success: bool,
     pub timestamp: u64,
     pub data: OrderBookSnapshotData,
 }
