@@ -9,7 +9,6 @@ use crate::orderbook::OrderBook;
 
 // WooX public endpoint for market data
 const WOOX_URL: &str = "wss://wss.woox.io/v3/public";
-
 const SYMBOL: &str = "PERP_ETH_USDT";
 const DEPTH: usize = 5;
 
@@ -20,7 +19,6 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // establish connection
     let (ws, _) = connect_async(WOOX_URL).await?;
     println!("Connected to {}", WOOX_URL);
-
     let (mut write, mut read) = ws.split();
 
     // subscribe to updates
@@ -49,6 +47,16 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
     
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
+        loop {
+            interval.tick().await;
+            if let Ok(snapshot) = fetch_snapshot().await {
+                let orderbook = OrderBook::from_snapshot(snapshot);
+                orderbook.print(DEPTH);
+            }
+        }
+    });
     
     // fetch a full orderbook snapshot
     let snapshot = fetch_snapshot().await?;
@@ -61,10 +69,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // initialize the local orderbook from the snapshot
     let mut orderbook = OrderBook::from_snapshot(snapshot);
-    println!("Orderbook initialized");
     orderbook.print(DEPTH);
-    println!("Incremental updates:");
-
     while let Some(update) = rx.recv().await {
         if orderbook.last_ts == update.prev_ts {
             orderbook.apply_update(update);
@@ -87,7 +92,6 @@ async fn fetch_snapshot() -> Result<OrderBookSnapshot, reqwest::Error> {
         SYMBOL,
         DEPTH
     );
-
     let resp = get(&url).await?;
     let snapshot = resp.json::<OrderBookSnapshot>().await?;
     Ok(snapshot)
