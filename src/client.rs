@@ -4,13 +4,14 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio::sync::mpsc;
 use crate::data::{WsOrderBookUpdate, WsOrderBookUpdateData, OrderBookSnapshot};
 use reqwest::get;
+use futures_util::{SinkExt, StreamExt};
 use crate::orderbook::OrderBook;
 
 // WooX public endpoint for market data
 const WOOX_URL: &str = "wss://wss.woox.io/v3/public";
 
 const SYMBOL: &str = "PERP_ETH_USDT";
-const DEPTH: usize = 50;
+const DEPTH: usize = 5;
 
 // Connects to the WooX websocket and buffers incoming orderbook updates
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -61,6 +62,8 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // initialize the local orderbook from the snapshot
     let mut orderbook = OrderBook::from_snapshot(snapshot);
     println!("Orderbook initialized");
+    orderbook.print(DEPTH);
+    println!("Incremental updates:");
 
     while let Some(update) = rx.recv().await {
         if orderbook.last_ts == update.prev_ts {
