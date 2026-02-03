@@ -9,16 +9,17 @@ pub struct WsOrderBookUpdate {
 // Data contained within an WsOrderBookUpdate
 #[derive(Debug, Deserialize)]
 pub struct WsOrderBookUpdateData {
+    #[serde(rename = "prevTs")]
     pub prev_ts: u64,
-    pub bids: Vec<BidAsk>,
-    pub asks: Vec<BidAsk>,
+    pub bids: Vec<PriceLevel>,
+    pub asks: Vec<PriceLevel>,
     pub ts: u64,
 }
 
 // Represents a single bid or ask level
 // can be used for both as they follow the same "price, quantity" structure
 #[derive(Debug, Deserialize)]
-pub struct BidAsk {
+pub struct PriceLevel {
     pub price: String,
     pub quantity: String,
 }
@@ -33,6 +34,6 @@ pub struct OrderBookSnapshot {
 // Data contained within an OrderBookSnapshot
 #[derive(Debug, Deserialize)]
 pub struct OrderBookSnapshotData {
-    pub bids: Vec<BidAsk>,
-    pub asks: Vec<BidAsk>,
+    pub bids: Vec<PriceLevel>,
+    pub asks: Vec<PriceLevel>,
 }

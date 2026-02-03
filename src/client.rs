@@ -9,8 +9,8 @@ use crate::orderbook::OrderBook;
 
 // WooX public endpoint for market data
 const WOOX_URL: &str = "wss://wss.woox.io/v3/public";
-const SYMBOL: &str = "PERP_ETH_USDT";
-const DEPTH: usize = 5;
+const SYMBOL: &str = "SPOT_ETH_USDT";
+const DEPTH: usize = 50;
 
 // Connects to the WooX websocket and buffers incoming orderbook updates
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -35,7 +35,9 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         while let Some(msg) = read.next().await {
             match msg {
                 Ok(Message::Text(text)) => {
+                    //println!("outer");
                     if let Ok(update) = serde_json::from_str::<WsOrderBookUpdate>(&text) {
+                        //println!("{:?}", update.data.bids);
                         let _ = tx_clone.send(update.data).await;
                     }
                 }
@@ -43,17 +45,6 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     let _ = write.send(Message::Pong(p)).await;
                 }
                 _ => {}
-            }
-        }
-    });
-    
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
-        loop {
-            interval.tick().await;
-            if let Ok(snapshot) = fetch_snapshot().await {
-                let orderbook = OrderBook::from_snapshot(snapshot);
-                orderbook.print(DEPTH);
             }
         }
     });
@@ -69,11 +60,10 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // initialize the local orderbook from the snapshot
     let mut orderbook = OrderBook::from_snapshot(snapshot);
-    orderbook.print(DEPTH);
     while let Some(update) = rx.recv().await {
-        if orderbook.last_ts == update.prev_ts {
-            orderbook.apply_update(update);
-            orderbook.print(DEPTH);
+        //println!("{:?}", update);
+        if orderbook.last_ts >= update.prev_ts {
+            orderbook.apply_print(update);
         } else if orderbook.last_ts < update.prev_ts {
             println!("Missed updates, refetching snapshot");
             let snapshot = fetch_snapshot().await?;
